@@ -10,6 +10,19 @@ Change Log:
 
 import internetarchive as ia
 import requests
+import json
+import time
+import os
+import sys
+
+# Replace this with the actual path where VLC is installed
+vlc_path = r"C:\Program Files\VideoLAN\VLC"
+
+if vlc_path not in os.environ["PATH"]:
+    os.environ["PATH"] += os.pathsep + vlc_path
+
+import vlc
+import time
 
 
 """
@@ -32,7 +45,7 @@ def findShow(desired_show_prefix, search):
         max_num_favorites = 0
         # IF ONLY ONE RECORDING, 
         if (len(filtered_search) == 1):        
-            selected_show = result['identifier']
+            selected_show_identifier = result['identifier']
             break
 
         ## IF THERE ARE MULTIPLE RECORDINGS, FIND THE RECORDING WITH THE HIGHEST NUMBER OF FAVORITES 
@@ -76,6 +89,52 @@ Change Log:
     6/3/25:     Initial creation
 """
 ## DISPLAY METADATA FOR SELECTED SHOW
-def retrieveMetadata(selected_show_identifier):
-    item = ia.get_item(selected_show_identifier)
-    return item
+def get_mp3_urls(identifier):
+
+    url = f"https://archive.org/metadata/{identifier}"
+    response = requests.get(url)
+
+    # Check for a successful response
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch metadata for {identifier} (status code {response.status_code})")
+
+    data = response.json()
+    # to print the json:
+    # print(json.dumps(data, indent=4))
+
+    mp3_urls = {}
+    base_url = f"https://archive.org/download/{identifier}/"
+
+    for file in data.get("files", []):
+        if file.get("format") in ["VBR MP3", "128Kbps MP3"] and file.get("name", "").endswith(".mp3"):
+            title = file.get("title", file.get("name"))
+            mp3_urls[title] = base_url + file["name"]
+        
+    return mp3_urls
+
+
+def play_url_with_loop(url):
+    instance = vlc.Instance()
+    player = instance.media_player_new()
+    media = instance.media_new(url)
+    player.set_media(media)
+    player.play()
+
+    # Wait for VLC to actually start playing
+    for _ in range(50):
+        if player.is_playing():
+            break
+        time.sleep(0.1)
+    else:
+        print("Failed to start playback.")
+        return
+
+    print("Playing... Press Ctrl+C to stop manually.")
+    try:
+        while player.is_playing():
+            current_time = player.get_time() / 1000  # seconds
+            print(f"Playing at {current_time:.1f}s", end="\r")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nStopped by user.")
+        player.stop()
