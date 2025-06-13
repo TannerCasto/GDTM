@@ -38,47 +38,66 @@ Return:         Returns the show identifier of type string
 Change Log:
     6/3/25:     Initial creation
 """
-def findShow(desired_show_prefix, search):
-    filtered_search = [entry for entry in search if entry['identifier'].startswith(desired_show_prefix)]
-    selected_show_identifier = ''
-    for result in filtered_search:
-        max_num_favorites = 0
-        # IF ONLY ONE RECORDING, 
-        if (len(filtered_search) == 1):        
-            selected_show_identifier = result['identifier']
-            break
+# def findShow(desired_show_prefix, search):
+#     filtered_search = [entry for entry in search if entry['identifier'].startswith(desired_show_prefix)]
+#     selected_show_identifier = ''
+#     for result in filtered_search:
+#         max_num_favorites = 0
+#         # IF ONLY ONE RECORDING, 
+#         if (len(filtered_search) == 1):        
+#             selected_show_identifier = result['identifier']
+#             break
 
-        ## IF THERE ARE MULTIPLE RECORDINGS, FIND THE RECORDING WITH THE HIGHEST NUMBER OF FAVORITES 
-        params = {
-            'q': result['identifier'],                      # Query
-            'fl[]': 'identifier,num_favorites',             # What to search for 
-            'output': 'json'                                # Output type
-        }
-        response = requests.get('https://archive.org/advancedsearch.php', params=params)
-        response_dict = response.json() # weird, yes but it returns a dictionary
+#         ## IF THERE ARE MULTIPLE RECORDINGS, FIND THE RECORDING WITH THE HIGHEST NUMBER OF FAVORITES 
+#         params = {
+#             'q': result['identifier'],                      # Query
+#             'fl[]': 'identifier,num_favorites',             # What to search for 
+#             'output': 'json'                                # Output type
+#         }
+#         response = requests.get('https://archive.org/advancedsearch.php', params=params)
+#         response_dict = response.json() # weird, yes but it returns a dictionary
 
-        ## **UNCOMMENT IF WANTING TO SEE THE .JSON DATA
-        # print(json.dumps(response_dict, indent=2))
+#         ## **UNCOMMENT IF WANTING TO SEE THE .JSON DATA
+#         # print(json.dumps(response_dict, indent=2))
     
         
-        # pull the number of favorites
-        # num_favorites = response_dict['response']['docs'][0]['num_favorites']
-        docs = response_dict.get('response', {}).get('docs', [])
-        num_favorites = None
-        for doc in docs:
-            if 'num_favorites' in doc:
-                num_favorites = doc['num_favorites']
-                break  # stop after finding the first one
+#         # pull the number of favorites
+#         # num_favorites = response_dict['response']['docs'][0]['num_favorites']
+#         docs = response_dict.get('response', {}).get('docs', [])
+#         num_favorites = None
+#         for doc in docs:
+#             if 'num_favorites' in doc:
+#                 num_favorites = doc['num_favorites']
+#                 break  # stop after finding the first one
 
-        if num_favorites is not None:
-            if num_favorites > max_num_favorites:
-                max_num_favorites = num_favorites
-                selected_show_identifier = result['identifier']
+#         if num_favorites is not None:
+#             if num_favorites > max_num_favorites:
+#                 max_num_favorites = num_favorites
+#                 selected_show_identifier = result['identifier']
             
 
-    print(f'Selected show: {selected_show_identifier}')
-    return selected_show_identifier
+#     print(f'Selected show: {selected_show_identifier}')
+#     return selected_show_identifier
+def findShow(desired_show_prefix):
+    # Query all recordings that start with the desired date and sort by popularity
+    params = {
+        'q': f'collection:GratefulDead AND identifier:{desired_show_prefix}*',
+        'fl[]': 'identifier,num_favorites',
+        'sort[]': 'num_favorites desc',
+        'rows': 1,
+        'output': 'json'
+    }
 
+    response = requests.get('https://archive.org/advancedsearch.php', params=params)
+    data = response.json()
+    docs = data.get('response', {}).get('docs', [])
+
+    if not docs:
+        raise ValueError("No recordings found for that date.")
+
+    selected_show_identifier = docs[0]['identifier']
+    print(f"Selected show: {selected_show_identifier}")
+    return selected_show_identifier
 """
 Function:       retrieveMetadata()
 Arguments:      selected_show_identifier -- selected show based on number of favorites (quality)
@@ -138,3 +157,9 @@ def play_url_with_loop(url):
     except KeyboardInterrupt:
         print("\nStopped by user.")
         player.stop()
+        return
+
+    if player.is_playing() == 0:
+        media = instance.media_new(url)
+        player.set_media(media)
+        player.play()

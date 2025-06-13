@@ -1,24 +1,31 @@
-from functions import *
+from classes import *
 
-## GET THE ENTIRE GRATEFUL DEAD LIBRARY
-search = ia.search_items('collection:GratefulDead')
+class DeadShowPlayer:
+    def __init__(self, date_prefix):
+        self.fsm = DeadShowFSM()
+        self.date_prefix = date_prefix
 
-## DETERMINE THE SHOW WE WANT **CHANGE THIS**
-desired_show_prefix = 'gd76-06-11'     # must follow form gdyy-mm-dd
+    def run(self):
+        # Load the show and build the MP3 list
+        self.fsm.trigger('load', self.date_prefix)
 
-# get and display show identifier
-selected_show_identifier = findShow(desired_show_prefix, search)
+        print("\nTrack list:")
+        for i, title in enumerate(self.fsm.mp3_urls, start=1):
+            print(f"{i}. {title}")
 
-# retrieve metadata from the show
-mp3_urls = get_mp3_urls(selected_show_identifier)   # type list
+        # Get input and play
+        try:
+            selection = int(input("\nSelect a track number to play: "))
+            self.fsm.trigger('select', selection)
+        except ValueError:
+            print("Invalid input.")
 
-for i, (title, url) in enumerate(mp3_urls.items(), start=1):
-    # print(f"{i}. {title}   {url}") #print url too
-    print(f"{i}. {title}") #print url too
-
-# get input to ask what show to play
-show_selection = int(input('Track Number: '))
-
-# play show
-song = list(mp3_urls.values())[show_selection-1]
-play_url_with_loop(song)
+# Usage
+if __name__ == "__main__":
+    mm = '02'
+    dd = '03'
+    yy = '68'
+    
+    show = DeadShowPlayer(f'gd{yy}-{mm}-{dd}')
+    show.run()
+    
